@@ -12,3 +12,4 @@ tiktoken
 altair
 streamlit-lottie
 Pillow
+tiktoken
