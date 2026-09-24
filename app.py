@@ -4,10 +4,11 @@ import traceback
 import streamlit as st
 from PIL import Image
 from PyPDF2 import PdfReader
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chat_models import ChatOpenAI
+
+# Importaciones actualizadas y compatibles de LangChain
+from langchain_text_splitters import CharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains.question_answering import load_qa_chain
 
 # ==========================================
@@ -20,15 +21,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS personalizados para una interfaz moderna y limpia
+# Estilos CSS personalizados para una interfaz moderna
 st.markdown("""
 <style>
-    /* Estilo global de la app */
     .main {
         padding: 2rem 3rem;
     }
     
-    /* Encabezado Principal */
     .brand-header {
         background: linear-gradient(135deg, #1E1B4B 0%, #4338CA 50%, #6D28D9 100%);
         padding: 2.5rem;
@@ -51,16 +50,6 @@ st.markdown("""
         margin: 0;
     }
 
-    /* Tarjetas contenedoras */
-    .stCard {
-        background-color: #FFFFFF;
-        padding: 1.5rem;
-        border-radius: 12px;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    }
-
-    /* Botón de envío destacado */
     .stButton>button {
         background: linear-gradient(90deg, #4F46E5 0%, #7C3AED 100%);
         color: white !important;
@@ -78,11 +67,6 @@ st.markdown("""
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
     }
-    
-    /* Ajustes para la barra lateral */
-    .css-1d3b10b {
-        background-color: #F9FAFB;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -90,18 +74,22 @@ st.markdown("""
 # BARRA LATERAL (CONFIGURACIÓN & MARCA)
 # ==========================================
 with st.sidebar:
-    # Imagen de marca/marketing
+    # Carga de imagen con compatibilidad garantizada
     try:
-        # Reemplaza 'brand_logo.png' por tu imagen de marketing
-        image = Image.open('brand_logo.png')
-        st.image(image, use_container_width=True)
+        image = Image.open('Chat_pdf.png')
+        st.image(image, use_column_width=True)
     except Exception:
-        # Imagen publicitaria de respaldo desde Unsplash si no encuentra el archivo local
-        st.image(
-            "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=600&q=80",
-            use_container_width=True,
-            caption="Brand & Market Intelligence"
-        )
+        try:
+            # Reintento con el nombre alternativo si existe
+            image = Image.open('brand_logo.png')
+            st.image(image, use_column_width=True)
+        except Exception:
+            # Imagen de respaldo
+            st.image(
+                "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=600&q=80",
+                use_column_width=True,
+                caption="Brand & Market Intelligence"
+            )
 
     st.markdown("## 🎯 BrandIntel AI")
     st.caption("Asistente RAG especializado en auditorías de marca, análisis de competencia y estrategias de mercadeo.")
@@ -165,7 +153,6 @@ st.divider()
 # ==========================================
 if pdf is not None and ke:
     try:
-        # Lectura y extracción del PDF con indicador de estado
         with st.status("Procesando e indexando el documento de marca...", expanded=True) as status:
             st.write("📄 Extrayendo contenido del documento...")
             pdf_reader = PdfReader(pdf)
@@ -195,13 +182,12 @@ if pdf is not None and ke:
             
             status.update(label="¡Indexación completada con éxito!", state="complete", expanded=False)
 
-        # Muestreo visual de métricas del documento
         st.success("Documento cargado e indexado. El sistema está listo para responder consultas de mercado.")
         
         # Interfaz de Consulta
         st.subheader("🔍 Consultar al Asistente de Marca")
         
-        # Formulario para evitar ejecuciones automáticas no deseadas y agregar botón explícito
+        # Formulario para envío explícito mediante botón
         with st.form(key="marketing_query_form"):
             user_question = st.text_area(
                 "Escribe tu pregunta estratégica:",
@@ -220,7 +206,7 @@ if pdf is not None and ke:
                     # Búsqueda semántica
                     docs = knowledge_base.similarity_search(user_question, k=4)
 
-                    # Modelo GPT optimizado para respuestas estructuradas
+                    # Modelo GPT optimizado
                     llm = ChatOpenAI(
                         temperature=0.2, 
                         model_name="gpt-4o-mini"
