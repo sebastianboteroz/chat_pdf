@@ -1,92 +1,245 @@
 import os
+import platform
+import traceback
 import streamlit as st
 from PIL import Image
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
-from langchain.llms import OpenAI
+from langchain.chat_models import ChatOpenAI
 from langchain.chains.question_answering import load_qa_chain
-import platform
 
-# App title and presentation
-st.title('Generación Aumentada por Recuperación (RAG) 💬')
-st.write("Versión de Python:", platform.python_version())
+# ==========================================
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS (UX/UI)
+# ==========================================
+st.set_page_config(
+    page_title="BrandIntel AI | Análisis de Marcas & Marketing",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Load and display image
-try:
-    image = Image.open('Chat_pdf.png')
-    st.image(image, width=350)
-except Exception as e:
-    st.warning(f"No se pudo cargar la imagen: {e}")
+# Estilos CSS personalizados para una interfaz moderna y limpia
+st.markdown("""
+<style>
+    /* Estilo global de la app */
+    .main {
+        padding: 2rem 3rem;
+    }
+    
+    /* Encabezado Principal */
+    .brand-header {
+        background: linear-gradient(135deg, #1E1B4B 0%, #4338CA 50%, #6D28D9 100%);
+        padding: 2.5rem;
+        border-radius: 16px;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .brand-header h1 {
+        color: #FFFFFF !important;
+        font-weight: 800;
+        font-size: 2.3rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .brand-header p {
+        color: #E0E7FF;
+        font-size: 1.1rem;
+        margin: 0;
+    }
 
-# Sidebar information
+    /* Tarjetas contenedoras */
+    .stCard {
+        background-color: #FFFFFF;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #E5E7EB;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Botón de envío destacado */
+    .stButton>button {
+        background: linear-gradient(90deg, #4F46E5 0%, #7C3AED 100%);
+        color: white !important;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 0.6rem 2rem;
+        border-radius: 8px;
+        border: none;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    
+    .stButton>button:hover {
+        opacity: 0.95;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+    
+    /* Ajustes para la barra lateral */
+    .css-1d3b10b {
+        background-color: #F9FAFB;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# BARRA LATERAL (CONFIGURACIÓN & MARCA)
+# ==========================================
 with st.sidebar:
-    st.subheader("Este Agente te ayudará a realizar análisis sobre el PDF cargado")
+    # Imagen de marca/marketing
+    try:
+        # Reemplaza 'brand_logo.png' por tu imagen de marketing
+        image = Image.open('brand_logo.png')
+        st.image(image, use_container_width=True)
+    except Exception:
+        # Imagen publicitaria de respaldo desde Unsplash si no encuentra el archivo local
+        st.image(
+            "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=600&q=80",
+            use_container_width=True,
+            caption="Brand & Market Intelligence"
+        )
 
-# Get API key from user
-ke = st.text_input('Ingresa tu Clave de OpenAI', type="password")
-if ke:
-    os.environ['OPENAI_API_KEY'] = ke
-else:
-    st.warning("Por favor ingresa tu clave de API de OpenAI para continuar")
+    st.markdown("## 🎯 BrandIntel AI")
+    st.caption("Asistente RAG especializado en auditorías de marca, análisis de competencia y estrategias de mercadeo.")
+    
+    st.divider()
 
-# PDF uploader
-pdf = st.file_uploader("Carga el archivo PDF", type="pdf")
+    # Credenciales de API
+    st.subheader("🔑 Autenticación")
+    ke = st.text_input(
+        "Clave de API de OpenAI", 
+        type="password",
+        placeholder="sk-...",
+        help="Tu API Key es requerida para procesar embeddings y consultas estratégicas."
+    )
+    
+    if ke:
+        os.environ['OPENAI_API_KEY'] = ke
+        st.success("API Key vinculada correctamente", icon="✅")
+    else:
+        st.warning("Ingresa tu API Key para habilitar la plataforma.", icon="⚠️")
 
-# Process the PDF if uploaded
+    st.divider()
+    st.caption(f"Entorno: Python v{platform.python_version()} | Engine: LangChain RAG")
+
+# ==========================================
+# CUERPO PRINCIPAL
+# ==========================================
+
+# Banner de Encabezado
+st.markdown("""
+<div class="brand-header">
+    <h1>Estrategia de Marca & Analítica de Mercadeo 📊</h1>
+    <p>Carga reportes de mercado, briefs publicitarios o planes de medios en PDF para obtener hallazgos estratégicos en segundos.</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Layout de dos columnas para carga de archivo y métricas rápidas
+col1, col2 = st.columns([1, 1], gap="large")
+
+with col1:
+    st.subheader("📁 Cargar Documento de Marca")
+    pdf = st.file_uploader(
+        "Selecciona un estudio de mercado, brief o reporte (PDF)",
+        type="pdf",
+        help="Sube un archivo en formato PDF para iniciar el análisis."
+    )
+
+with col2:
+    st.subheader("💡 Ejemplos de Consultas")
+    st.markdown("""
+    * *"¿Cuál es la propuesta de valor principal de la marca?"*
+    * *"Identifica el buyer persona descrito en el reporte."*
+    * *"¿Cuáles son los canales de comunicación clave recomendados?"*
+    * *"Resume las fortalezas y debilidades frente a los competidores."*
+    """)
+
+st.divider()
+
+# ==========================================
+# LÓGICA DE PROCESAMIENTO RAG
+# ==========================================
 if pdf is not None and ke:
     try:
-        # Extract text from PDF
-        pdf_reader = PdfReader(pdf)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-        
-        st.info(f"Texto extraído: {len(text)} caracteres")
-        
-        # Split text into chunks
-        text_splitter = CharacterTextSplitter(
-            separator="\n",
-            chunk_size=500,
-            chunk_overlap=20,
-            length_function=len
-        )
-        chunks = text_splitter.split_text(text)
-        st.success(f"Documento dividido en {len(chunks)} fragmentos")
-        
-        # Create embeddings and knowledge base
-        embeddings = OpenAIEmbeddings()
-        knowledge_base = FAISS.from_texts(chunks, embeddings)
-        
-        # User question interface
-        st.subheader("Escribe qué quieres saber sobre el documento")
-        user_question = st.text_area(" ", placeholder="Escribe tu pregunta aquí...")
-        
-        # Process question when submitted
-        if user_question:
-            docs = knowledge_base.similarity_search(user_question)
+        # Lectura y extracción del PDF con indicador de estado
+        with st.status("Procesando e indexando el documento de marca...", expanded=True) as status:
+            st.write("📄 Extrayendo contenido del documento...")
+            pdf_reader = PdfReader(pdf)
+            text = ""
+            for page in pdf_reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted
+
+            st.write(f"✅ Texto extraído: **{len(text):,}** caracteres.")
+
+            # Segmentación de texto (Chunking)
+            st.write("✂️ Dividiendo el texto en bloques conceptuales...")
+            text_splitter = CharacterTextSplitter(
+                separator="\n",
+                chunk_size=600,
+                chunk_overlap=50,
+                length_function=len
+            )
+            chunks = text_splitter.split_text(text)
+            st.write(f"✅ Documento estructurado en **{len(chunks)}** bloques estratégicos.")
+
+            # Creación del Vector Store
+            st.write("🧠 Generando matriz vectorial e índice semántico...")
+            embeddings = OpenAIEmbeddings()
+            knowledge_base = FAISS.from_texts(chunks, embeddings)
             
-            # Use a current model instead of deprecated text-davinci-003
-            # Options: "gpt-3.5-turbo-instruct" or "gpt-4o" depending on your API access
-            llm = OpenAI(temperature=0, model_name="gpt-4o-mini-2024-07-18")
+            status.update(label="¡Indexación completada con éxito!", state="complete", expanded=False)
+
+        # Muestreo visual de métricas del documento
+        st.success("Documento cargado e indexado. El sistema está listo para responder consultas de mercado.")
+        
+        # Interfaz de Consulta
+        st.subheader("🔍 Consultar al Asistente de Marca")
+        
+        # Formulario para evitar ejecuciones automáticas no deseadas y agregar botón explícito
+        with st.form(key="marketing_query_form"):
+            user_question = st.text_area(
+                "Escribe tu pregunta estratégica:",
+                placeholder="Ejemplo: Resume la estrategia de posicionamiento y las métricas clave (KPIs) mencionadas...",
+                rows=3
+            )
             
-            # Load QA chain
-            chain = load_qa_chain(llm, chain_type="stuff")
-            
-            # Run the chain
-            response = chain.run(input_documents=docs, question=user_question)
-            
-            # Display the response
-            st.markdown("### Respuesta:")
-            st.markdown(response)
-                
+            submit_button = st.form_submit_button(label="🚀 Analizar y Generar Respuesta")
+
+        # Procesamiento de la pregunta al presionar el botón
+        if submit_button:
+            if not user_question.strip():
+                st.warning("Por favor escribe una consulta antes de procesar.", icon="ℹ️")
+            else:
+                with st.spinner("Analizando la información estratégica del documento..."):
+                    # Búsqueda semántica
+                    docs = knowledge_base.similarity_search(user_question, k=4)
+
+                    # Modelo GPT optimizado para respuestas estructuradas
+                    llm = ChatOpenAI(
+                        temperature=0.2, 
+                        model_name="gpt-4o-mini"
+                    )
+
+                    chain = load_qa_chain(llm, chain_type="stuff")
+                    response = chain.run(input_documents=docs, question=user_question)
+
+                    # Presentación visual de la respuesta
+                    st.markdown("---")
+                    st.subheader("📋 Hallazgos & Respuesta Estratégica")
+                    st.info(response)
+
     except Exception as e:
-        st.error(f"Error al procesar el PDF: {str(e)}")
-        # Add detailed error for debugging
-        import traceback
-        st.error(traceback.format_exc())
+        st.error("Ocurrió un problema al procesar el archivo o ejecutar la consulta.")
+        with st.expander("Ver detalle técnico del error"):
+            st.code(traceback.format_exc())
+
 elif pdf is not None and not ke:
-    st.warning("Por favor ingresa tu clave de API de OpenAI para continuar")
+    st.warning("⚠️ Debes ingresar tu Clave de API de OpenAI en la barra lateral para continuar.")
 else:
-    st.info("Por favor carga un archivo PDF para comenzar")
+    st.info("👋 Para comenzar, carga un archivo PDF de mercadeo desde el panel superior.")
