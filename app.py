@@ -5,7 +5,7 @@ import streamlit as st
 from PIL import Image
 from PyPDF2 import PdfReader
 
-# Importaciones modernas sin errores de módulos
+# Importaciones modernas de LangChain
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -150,7 +150,7 @@ if pdf is not None and ke:
             user_question = st.text_area(
                 "Escribe tu pregunta estratégica:",
                 placeholder="Ejemplo: Resume la estrategia de posicionamiento y las métricas clave (KPIs)...",
-                rows=3
+                height=100
             )
             
             submit_button = st.form_submit_button(label="🚀 Analizar y Generar Respuesta")
