@@ -5,10 +5,12 @@ import streamlit as st
 from PIL import Image
 from PyPDF2 import PdfReader
 
-# Importaciones modernas sin chains obsoletas
-from langchain_text_splitters import CharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+# Importaciones compatibles con la versión actual de tu repositorio
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.chat_models import ChatOpenAI
+from langchain.chains.question_answering import load_qa_chain
 
 # ==========================================
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS (UX/UI)
@@ -20,9 +22,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Estilos CSS personalizados
 st.markdown("""
 <style>
-    .main { padding: 1.5rem 2rem; }
+    .main {
+        padding: 1.5rem 2rem;
+    }
     .brand-header {
         background: linear-gradient(135deg, #1E1B4B 0%, #4338CA 50%, #6D28D9 100%);
         padding: 2rem;
@@ -52,7 +57,9 @@ st.markdown("""
         border: none;
         width: 100%;
     }
-    .stButton>button:hover { opacity: 0.92; }
+    .stButton>button:hover {
+        opacity: 0.92;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -60,25 +67,19 @@ st.markdown("""
 # BARRA LATERAL (CONFIGURACIÓN & MARCA)
 # ==========================================
 with st.sidebar:
+    # Carga de imagen segura (sin parámetros propensos a error)
     try:
         image = Image.open('Chat_pdf.png')
-        st.image(image, use_column_width=True)
+        st.image(image, width=280)
     except Exception:
-        try:
-            image = Image.open('brand_logo.png')
-            st.image(image, use_column_width=True)
-        except Exception:
-            st.image(
-                "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=600&q=80",
-                use_column_width=True,
-                caption="Brand & Market Intelligence"
-            )
+        st.markdown("### 📈 BrandIntel AI")
 
     st.markdown("## 🎯 BrandIntel AI")
     st.caption("Asistente RAG especializado en auditorías de marca, análisis de competencia y estrategias de mercadeo.")
     
     st.markdown("---")
 
+    # Credenciales de API
     st.subheader("🔑 Autenticación")
     ke = st.text_input(
         "Clave de API de OpenAI", 
@@ -99,6 +100,8 @@ with st.sidebar:
 # ==========================================
 # CUERPO PRINCIPAL
 # ==========================================
+
+# Banner de Encabezado
 st.markdown("""
 <div class="brand-header">
     <h1>Estrategia de Marca & Analítica de Mercadeo 📊</h1>
@@ -152,6 +155,7 @@ if pdf is not None and ke:
 
         st.success(f"¡Documento indexado con éxito! ({len(chunks)} bloques procesados)")
         
+        # Interfaz de Consulta con Formulario (Botón explícito)
         st.subheader("🔍 Consultar al Asistente de Marca")
         
         with st.form(key="marketing_query_form"):
@@ -168,23 +172,19 @@ if pdf is not None and ke:
                 st.warning("Por favor escribe una consulta antes de procesar.")
             else:
                 with st.spinner("Analizando la información estratégica del documento..."):
-                    # Búsqueda de contexto relevante
                     docs = knowledge_base.similarity_search(user_question, k=4)
-                    context_text = "\n\n".join([doc.page_content for doc in docs])
 
-                    # Consulta al modelo con prompt estructurado
-                    llm = ChatOpenAI(temperature=0.2, model_name="gpt-4o-mini")
-                    
-                    messages = [
-                        ("system", "Eres un experto analista de mercadeo y estrategia de marcas. Responde la pregunta del usuario utilizando exclusivamente la siguiente información de contexto tomada del documento."),
-                        ("user", f"Contexto:\n{context_text}\n\nPregunta: {user_question}")
-                    ]
-                    
-                    response = llm.invoke(messages)
+                    llm = ChatOpenAI(
+                        temperature=0.2, 
+                        model_name="gpt-3.5-turbo"
+                    )
+
+                    chain = load_qa_chain(llm, chain_type="stuff")
+                    response = chain.run(input_documents=docs, question=user_question)
 
                     st.markdown("---")
                     st.subheader("📋 Hallazgos & Respuesta Estratégica")
-                    st.info(response.content)
+                    st.info(response)
 
     except Exception as e:
         st.error("Ocurrió un problema al procesar el archivo o ejecutar la consulta.")
